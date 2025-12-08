@@ -16,6 +16,7 @@ const GRID_COLS: usize = 3;
 struct HtpcApp {
     apps: Vec<(String, AppEntry)>,
     selected: usize,
+    bg_texture: Option<egui::TextureHandle>,
 }
 
 impl HtpcApp {
@@ -31,7 +32,11 @@ impl HtpcApp {
                 .to_string()
                 .as_str(),
         )?;
-        Ok(Self { apps, selected: 0 })
+        Ok(Self {
+            apps,
+            selected: 0,
+            bg_texture: None,
+        })
     }
 
     fn launch(&self, idx: usize) -> Result<(), Box<dyn Error>> {
@@ -81,23 +86,6 @@ impl eframe::App for HtpcApp {
             self.launch(self.selected).expect("Failed to launch app");
         }
 
-        // Clock
-        let now = chrono::Local::now();
-        let time_string = now.format("%I:%M %p").to_string();
-
-        egui::TopBottomPanel::top("clock_panel")
-            .show_separator_line(false)
-            .show(ctx, |ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        egui::RichText::new(time_string)
-                            .size(40.0)
-                            .color(ui.visuals().text_color()),
-                    );
-                    ui.add_space(20.0);
-                });
-            });
-
         // Display apps
         egui::CentralPanel::default().show(ctx, |ui| {
             let available = ui.available_size();
@@ -116,6 +104,61 @@ impl eframe::App for HtpcApp {
             let offset_x = (available.x - total_width) / 2.0;
             let offset_y = (available.y - total_height) / 2.0;
 
+            // Load background
+            if self.bg_texture.is_none() {
+                if let Some(tex) = load_texture(ui, "background", "assets/background.jpg") {
+                    self.bg_texture = Some(tex);
+                }
+            }
+
+            let screen_rect = ctx.screen_rect();
+            let screen_w = screen_rect.width();
+            let screen_h = screen_rect.height();
+
+            // Draw background
+            if let Some(bg) = &self.bg_texture {
+                let img_w = bg.size()[0] as f32;
+                let img_h = bg.size()[1] as f32;
+
+                let screen_aspect = screen_w / screen_h;
+                let img_aspect = img_w / img_h;
+
+                let (uv_min, uv_max) = if img_aspect > screen_aspect {
+                    let scale = screen_h / img_h;
+                    let scaled_w = img_w * scale;
+                    let excess = (scaled_w - screen_w) / scaled_w;
+                    let crop = excess / 2.0;
+                    (egui::pos2(crop, 0.0), egui::pos2(1.0 - crop, 1.0))
+                } else {
+                    let scale = screen_w / img_w;
+                    let scaled_h = img_h * scale;
+                    let excess = (scaled_h - screen_h) / scaled_h;
+                    let crop = excess / 2.0;
+                    (egui::pos2(0.0, crop), egui::pos2(1.0, 1.0 - crop))
+                };
+
+                let painter = ctx.layer_painter(egui::LayerId::background());
+
+                painter.image(
+                    bg.id(),
+                    screen_rect,
+                    egui::Rect {
+                        min: uv_min,
+                        max: uv_max,
+                    },
+                    egui::Color32::WHITE,
+                );
+            }
+
+            // Draw tint
+            let painter = ctx.layer_painter(egui::LayerId::background());
+            painter.rect_filled(
+                screen_rect,
+                0.0,
+                egui::Color32::from_rgba_unmultiplied(0, 0, 0, 140),
+            );
+
+            // Add top buffer
             ui.add_space(offset_y);
 
             for row in 0..GRID_ROWS {
@@ -169,6 +212,25 @@ impl eframe::App for HtpcApp {
                 }
             }
         });
+
+        // Clock
+        let now = chrono::Local::now();
+        let time_string = now.format("%I:%M %p").to_string();
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            "clock_layer".into(),
+        ));
+
+        let screen_rect = ctx.screen_rect();
+        let pos = egui::pos2(screen_rect.max.x - 20.0, screen_rect.min.y + 20.0);
+
+        painter.text(
+            pos,
+            egui::Align2::RIGHT_TOP,
+            time_string,
+            egui::FontId::proportional(100.0),
+            egui::Color32::WHITE,
+        );
     }
 }
 
