@@ -46,8 +46,8 @@ impl HtpcApp {
 
 impl eframe::App for HtpcApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // 'q' closes app
-        if ctx.input(|i| i.key_pressed(egui::Key::Q)) {
+        // 'c' closes app
+        if ctx.input(|i| i.key_pressed(egui::Key::C)) {
             frame.close();
             return;
         }
