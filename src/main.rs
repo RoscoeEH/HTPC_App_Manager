@@ -46,11 +46,12 @@ impl HtpcApp {
 
 impl eframe::App for HtpcApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // 'c' closes app
-        if ctx.input(|i| i.key_pressed(egui::Key::C)) {
-            frame.close();
-            return;
-        }
+        // This seems to be just more annoying to deal with
+        // // 'c' closes app
+        // if ctx.input(|i| i.key_pressed(egui::Key::C)) {
+        //     frame.close();
+        //     return;
+        // }
 
         // Arrow keys move
         if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
