@@ -106,7 +106,13 @@ impl eframe::App for HtpcApp {
 
             // Load background
             if self.bg_texture.is_none() {
-                if let Some(tex) = load_texture(ui, "background", "assets/background.jpg") {
+                if let Some(tex) = load_texture(
+                    ui,
+                    "background",
+                    shellexpand::tilde("~/.config/htpc_app_manager/background.jpg")
+                        .to_string()
+                        .as_str(),
+                ) {
                     self.bg_texture = Some(tex);
                 }
             }
