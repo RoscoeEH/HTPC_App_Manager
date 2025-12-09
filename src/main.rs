@@ -51,12 +51,14 @@ impl HtpcApp {
 
 impl eframe::App for HtpcApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // This seems to be just more annoying to deal with
-        // // 'c' closes app
-        // if ctx.input(|i| i.key_pressed(egui::Key::C)) {
-        //     frame.close();
-        //     return;
-        // }
+        // Update every 30s for clock
+        ctx.request_repaint_after(std::time::Duration::from_secs(45));
+
+        // 'c' closes app
+        if ctx.input(|i| i.key_pressed(egui::Key::C)) {
+            frame.close();
+            return;
+        }
 
         // Arrow keys move
         if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
