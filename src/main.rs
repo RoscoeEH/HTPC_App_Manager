@@ -17,6 +17,8 @@ struct HtpcApp {
     apps: Vec<(String, AppEntry)>,
     selected: usize,
     bg_texture: Option<egui::TextureHandle>,
+    animation_start: Option<std::time::Instant>,
+    animation_idx: Option<usize>,
 }
 
 impl HtpcApp {
@@ -36,6 +38,8 @@ impl HtpcApp {
             apps,
             selected: 0,
             bg_texture: None,
+            animation_start: None,
+            animation_idx: None,
         })
     }
 
@@ -52,7 +56,7 @@ impl HtpcApp {
 impl eframe::App for HtpcApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // Update every 30s for clock
-        ctx.request_repaint_after(std::time::Duration::from_secs(45));
+        ctx.request_repaint_after(std::time::Duration::from_secs(30));
 
         // 'c' closes app
         if ctx.input(|i| i.key_pressed(egui::Key::C)) {
@@ -85,6 +89,8 @@ impl eframe::App for HtpcApp {
 
         // Launch app
         if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
+            self.animation_start = Some(std::time::Instant::now());
+            self.animation_idx = Some(self.selected);
             self.launch(self.selected).expect("Failed to launch app");
         }
 
@@ -185,6 +191,31 @@ impl eframe::App for HtpcApp {
                                 ui.visuals().faint_bg_color
                             };
                             ui.painter().rect_filled(rect, 12.0, bg_color);
+
+                            // Flash animation on press
+                            if Some(idx) == self.animation_idx {
+                                if let Some(start) = self.animation_start {
+                                    let elapsed = start.elapsed().as_secs_f32();
+                                    let duration = 0.25;
+
+                                    if elapsed < duration {
+                                        // Flash overlay
+                                        let alpha = (1.0 - (elapsed / duration)).clamp(0.0, 1.0);
+                                        let flash = egui::Color32::from_rgba_unmultiplied(
+                                            255,
+                                            255,
+                                            255,
+                                            (200.0 * alpha) as u8,
+                                        );
+                                        ui.painter().rect_filled(rect, 12.0, flash);
+
+                                        ctx.request_repaint(); // Animate
+                                    } else {
+                                        self.animation_idx = None;
+                                        self.animation_start = None;
+                                    }
+                                }
+                            }
 
                             // Draw icon
                             if let Some(texture) =
