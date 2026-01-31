@@ -1,4 +1,5 @@
 use eframe::egui;
+use gilrs::{Button, EventType, Gilrs};
 use serde::Deserialize;
 use std::{collections::BTreeMap, error::Error, fs, process::Command};
 
@@ -19,6 +20,8 @@ struct HtpcApp {
     bg_texture: Option<egui::TextureHandle>,
     animation_start: Option<std::time::Instant>,
     animation_idx: Option<usize>,
+    gilrs: Gilrs,
+    last_any_pressed: bool,
 }
 
 impl HtpcApp {
@@ -34,12 +37,22 @@ impl HtpcApp {
                 .to_string()
                 .as_str(),
         )?;
+
+        let gilrs = Gilrs::new().unwrap();
+
+        // Open gamepad
+        for (_id, gamepad) in gilrs.gamepads() {
+            println!("Found gamepad: {}", gamepad.name());
+        }
+
         Ok(Self {
             apps,
             selected: 0,
             bg_texture: None,
             animation_start: None,
             animation_idx: None,
+            gilrs: Gilrs::new().unwrap(),
+            last_any_pressed: false,
         })
     }
 
@@ -51,47 +64,115 @@ impl HtpcApp {
 
         Ok(())
     }
+    fn gamepad_actions(&mut self) -> (bool, bool, bool, bool, bool) {
+        let mut left = false;
+        let mut right = false;
+        let mut up = false;
+        let mut down = false;
+        let mut activate = false;
+
+        self.gilrs.inc();
+
+        // Event queue
+        while let Some(ev) = self.gilrs.next_event() {
+            match ev.event {
+                EventType::ButtonPressed(Button::DPadLeft, _) => left = true,
+                EventType::ButtonPressed(Button::DPadRight, _) => right = true,
+                EventType::ButtonPressed(Button::DPadUp, _) => up = true,
+                EventType::ButtonPressed(Button::DPadDown, _) => down = true,
+                EventType::ButtonPressed(Button::South, _) => activate = true,
+                _ => {}
+            }
+        }
+
+        // Polling state
+        for (_id, gamepad) in self.gilrs.gamepads() {
+            if gamepad.is_pressed(Button::DPadLeft) {
+                left = true;
+            }
+            if gamepad.is_pressed(Button::DPadRight) {
+                right = true;
+            }
+            if gamepad.is_pressed(Button::DPadUp) {
+                up = true;
+            }
+            if gamepad.is_pressed(Button::DPadDown) {
+                down = true;
+            }
+            if gamepad.is_pressed(Button::South) {
+                activate = true;
+            }
+        }
+
+        // Debounce by frame
+        let any_pressed = left || right || up || down || activate;
+        let trigger = any_pressed && !self.last_any_pressed;
+
+        self.last_any_pressed = any_pressed;
+
+        if trigger {
+            (left, right, up, down, activate)
+        } else {
+            (false, false, false, false, false)
+        }
+    }
 }
 
 impl eframe::App for HtpcApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        // Keeps input active for dpad
+        ctx.request_repaint();
+
         // Update every 30s for clock
         ctx.request_repaint_after(std::time::Duration::from_secs(30));
 
-        // 'c' closes app
-        if ctx.input(|i| i.key_pressed(egui::Key::C)) {
-            frame.close();
-            return;
-        }
+        let focused = frame.info().window_info.focused;
 
-        // Arrow keys move
-        if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
-            if self.selected + 1 < self.apps.len() && (self.selected + 1) % GRID_COLS != 0 {
-                self.selected += 1;
-            }
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
-            if self.selected % GRID_COLS != 0 {
-                self.selected -= 1;
-            }
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
-            let next = self.selected + GRID_COLS;
-            if next < self.apps.len() {
-                self.selected = next;
-            }
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
-            if self.selected >= GRID_COLS {
-                self.selected -= GRID_COLS;
-            }
-        }
+        // Checks if the home screen is focused before taking input
+        if focused {
+            // Sets up gamepad/keyboard actions
+            let (gp_left, gp_right, gp_up, gp_down, gp_activate) = self.gamepad_actions();
+            let key_right = ctx.input(|i| i.key_pressed(egui::Key::ArrowRight));
+            let key_left = ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft));
+            let key_down = ctx.input(|i| i.key_pressed(egui::Key::ArrowDown));
+            let key_up = ctx.input(|i| i.key_pressed(egui::Key::ArrowUp));
+            let key_enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
 
-        // Launch app
-        if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
-            self.animation_start = Some(std::time::Instant::now());
-            self.animation_idx = Some(self.selected);
-            self.launch(self.selected).expect("Failed to launch app");
+            // 'c' closes app
+            if ctx.input(|i| i.key_pressed(egui::Key::C)) {
+                frame.close();
+                return;
+            }
+
+            // Arrow keys move
+            if key_right || gp_right {
+                if self.selected + 1 < self.apps.len() && (self.selected + 1) % GRID_COLS != 0 {
+                    self.selected += 1;
+                }
+            }
+            if key_left || gp_left {
+                if self.selected % GRID_COLS != 0 {
+                    self.selected -= 1;
+                }
+            }
+            if key_down || gp_down {
+                let next = self.selected + GRID_COLS;
+                if next < self.apps.len() {
+                    self.selected = next;
+                }
+            }
+            if key_up || gp_up {
+                if self.selected >= GRID_COLS {
+                    self.selected -= GRID_COLS;
+                }
+            }
+
+            // Launch App
+            if key_enter || gp_activate {
+                self.animation_start = Some(std::time::Instant::now());
+                self.animation_idx = Some(self.selected);
+                self.launch(self.selected).expect("Failed to launch app");
+            }
         }
 
         // Display apps
