@@ -1,21 +1,23 @@
 use eframe::egui;
 use gilrs::{Button, EventType, Gilrs};
 use serde::Deserialize;
-use std::{collections::BTreeMap, error::Error, fs, process::Command};
+use std::{error::Error, fs, process::Command};
 
 #[derive(Debug, Deserialize, Clone)]
 struct AppEntry {
+    #[allow(dead_code)]
+    name: String, // Name for interacting with json, not used
     run: String,
     icon: String,
 }
 
-type AppConfig = BTreeMap<String, AppEntry>;
+type AppConfig = Vec<AppEntry>;
 
 const GRID_ROWS: usize = 2;
 const GRID_COLS: usize = 3;
 
 struct HtpcApp {
-    apps: Vec<(String, AppEntry)>,
+    apps: Vec<AppEntry>,
     selected: usize,
     bg_texture: Option<egui::TextureHandle>,
     animation_start: Option<std::time::Instant>,
@@ -25,10 +27,10 @@ struct HtpcApp {
 }
 
 impl HtpcApp {
-    fn load_from_json(path: &str) -> Result<Vec<(String, AppEntry)>, Box<dyn Error>> {
+    fn load_from_json(path: &str) -> Result<Vec<AppEntry>, Box<dyn Error>> {
         let file = fs::read_to_string(path)?;
-        let parsed: AppConfig = serde_json::from_str(&file)?;
-        Ok(parsed.into_iter().collect())
+        let apps: AppConfig = serde_json::from_str(&file)?;
+        Ok(apps)
     }
 
     fn new() -> Result<Self, Box<dyn Error>> {
@@ -57,7 +59,7 @@ impl HtpcApp {
     }
 
     fn launch(&self, idx: usize) -> Result<(), Box<dyn Error>> {
-        if let Some((_name, entry)) = self.apps.get(idx) {
+        if let Some(entry) = self.apps.get(idx) {
             let script_path = shellexpand::tilde(&entry.run).to_string();
             let _ = Command::new("bash").arg(script_path).spawn()?;
         }
@@ -265,7 +267,7 @@ impl eframe::App for HtpcApp {
                         let (rect, _) = ui.allocate_exact_size(tile_size, egui::Sense::hover());
 
                         // Draw background
-                        if let Some((_name, app)) = self.apps.get(idx) {
+                        if let Some(app) = self.apps.get(idx) {
                             let bg_color = if idx == self.selected {
                                 ui.visuals().selection.bg_fill
                             } else {

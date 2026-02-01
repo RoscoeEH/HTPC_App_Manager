@@ -1,10 +1,12 @@
-{
-  "Jellyfin": {
-    "run": "~/.config/htpc_app_manager/jellyfin/run_jellyfin.sh",
-    "icon": "~/.config/htpc_app_manager/jellyfin/jellyfin_icon.png"
-  },
-  "Steam": {
+[
+  {
+    "name": "Steam",
     "run": "~/.config/htpc_app_manager/steam/run_steam.sh",
     "icon": "~/.config/htpc_app_manager/steam/steam_icon.png"
+  },
+  {
+    "name": "Jellyfin",
+    "run": "~/.config/htpc_app_manager/jellyfin/run_jellyfin.sh",
+    "icon": "~/.config/htpc_app_manager/jellyfin/jellyfin_icon.png"
   }
-}
+]
