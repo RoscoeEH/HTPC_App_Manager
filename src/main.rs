@@ -57,13 +57,13 @@ impl HtpcApp {
 }
 
 impl eframe::App for HtpcApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Update every 30s for clock
         ctx.request_repaint_after(std::time::Duration::from_secs(15));
 
         // 'c' closes app
         if ctx.input(|i| i.key_pressed(egui::Key::C)) {
-            frame.close();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
 
@@ -288,8 +288,9 @@ fn load_texture(ui: &egui::Ui, name: &str, path: &str) -> Option<egui::TextureHa
 
 fn main() {
     let options = eframe::NativeOptions {
-        fullscreen: true,
-        always_on_top: false,
+        viewport: egui::ViewportBuilder::default()
+            .with_fullscreen(true)
+            .with_always_on_top(),
         ..Default::default()
     };
 
